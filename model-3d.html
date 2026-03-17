@@ -221,33 +221,59 @@
   // Street / road
   var MRd = new THREE.MeshPhongMaterial({color: 0x5A5856, shininess: 3});
   var MSt = new THREE.MeshPhongMaterial({color: 0xC8C2B8, shininess: 2});
-  var MGrDark = new THREE.MeshPhongMaterial({color: 0x6AA838, shininess: 2});
-  bx(260, 0.3, 30, MRd, 0, -0.15, 52);
-  bx(260, 0.35, 4, MSt, 0, -0.12, 35);
+  bx(260, 0.3, 30, MRd, 0, -0.15, 52);  // road
+  bx(260, 0.35, 4, MSt, 0, -0.12, 35);   // sidewalk
 
-  // Plot ground (main green)
-  bx(100, 0.5, 80, MGr, 0, -0.25, 3);
+  // ── LAWN TEXTURE (entire plot) ──
+  function makeLawnTexture(seed) {
+    var c = document.createElement('canvas');
+    var s = 512; c.width = s; c.height = s;
+    var ctx = c.getContext('2d');
+    // Base: warm, natural lawn green
+    ctx.fillStyle = '#4E9A2C'; ctx.fillRect(0,0,s,s);
+    var _ls = seed || 31;
+    function lr() { _ls = (_ls * 16807) % 2147483647; return (_ls-1)/2147483646; }
+    // Subtle mowing stripe pattern (horizontal bands)
+    for(var sy=0; sy<s; sy+=16) {
+      ctx.fillStyle = (Math.floor(sy/16) % 2 === 0) ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)';
+      ctx.fillRect(0, sy, s, 16);
+    }
+    // Grass blade detail
+    var greens = ['#3D8A20','#5AA830','#4A9428','#62B238','#448E24','#56A42E'];
+    for(var i=0; i<600; i++) {
+      ctx.fillStyle = greens[i % greens.length];
+      ctx.globalAlpha = 0.4 + lr()*0.4;
+      ctx.fillRect(lr()*s, lr()*s, 1+lr()*2, 3+lr()*6);
+    }
+    ctx.globalAlpha = 1.0;
+    var tex = new THREE.CanvasTexture(c);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+  }
+
+  // Single unified lawn covering the entire plot
+  var lawnTex = makeLawnTexture(31);
+  lawnTex.repeat.set(100/8, 80/8);
+  var lawnMat = new THREE.MeshPhongMaterial({map: lawnTex, shininess: 2});
+  var lawn = new THREE.Mesh(new THREE.BoxGeometry(100, 0.4, 80), lawnMat);
+  lawn.position.set(0, -0.2, 3);
+  lawn.receiveShadow = true; scene.add(lawn);
 
   // ── PAVING BLOCK TEXTURE ──
-  // Ghana standard: 200×100mm (0.66×0.33ft) interlocking pavers, 60mm thick
   function makePaverTexture() {
     var c = document.createElement('canvas');
-    // Each tile = 4×4 ft of real paving, drawn at high res
     var s = 256; c.width = s; c.height = s;
     var ctx = c.getContext('2d');
-    // Block dimensions in pixels (0.66ft and 0.33ft mapped to 4ft tile)
-    var bw = s * (0.66/4); // ~42px per block length
-    var bh = s * (0.33/4); // ~21px per block width
-    var gap = 1.5;
+    var bw = s * (0.66/4), bh = s * (0.33/4), gap = 1.5;
     var colors = ['#C8BAA0','#D0C2A8','#BCAE96','#C4B69C','#D4C8B0','#B8AA90'];
-    ctx.fillStyle = '#706858'; ctx.fillRect(0,0,s,s); // joint/sand color
+    ctx.fillStyle = '#706858'; ctx.fillRect(0,0,s,s);
     var ci = 0;
     for(var row=0, ry=0; ry < s+bh; row++, ry += bh+gap) {
       var off = (row % 2 === 1) ? (bw+gap)*0.5 : 0;
       for(var rx = -bw+off; rx < s+bw; rx += bw+gap) {
         ctx.fillStyle = colors[ci % colors.length]; ci++;
         ctx.fillRect(rx, ry, bw-gap, bh-gap);
-        // Subtle shade variation
         ctx.fillStyle = 'rgba(0,0,0,0.04)';
         ctx.fillRect(rx, ry+bh*0.7, bw-gap, bh*0.3-gap);
       }
@@ -260,93 +286,67 @@
 
   function pavedArea(cx, cz, w, d, y) {
     var tex = makePaverTexture();
-    // Repeat so each 4ft of world = one texture tile
     tex.repeat.set(w/4, d/4);
     var mat = new THREE.MeshPhongMaterial({map: tex, shininess: 4});
     var m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.2, d), mat);
     m.position.set(cx, y, cz);
     m.receiveShadow = true; scene.add(m);
-    // Concrete kerb edging (0.33ft wide ≈ 4" kerb)
-    var MKerb = new THREE.MeshPhongMaterial({color: 0x8A7E6E, shininess: 5});
-    bx(w+0.5, 0.35, 0.25, MKerb, cx, y-0.02, cz - d/2);
-    bx(w+0.5, 0.35, 0.25, MKerb, cx, y-0.02, cz + d/2);
-    bx(0.25, 0.35, d, MKerb, cx - w/2, y-0.02, cz);
-    bx(0.25, 0.35, d, MKerb, cx + w/2, y-0.02, cz);
   }
 
   // ── PAVED AREAS ──
-  // Entry area (wide strip in front)
-  pavedArea(0, 33, TW+4, 5, 0.05);
-  // Walkway connecting porches
-  pavedArea(0, 22, TW+2, 3, 0.05);
-  // Paths from gates to street
+  pavedArea(0, 33, TW+4, 5, 0.05);           // entry strip
+  pavedArea(0, 22, TW+2, 3, 0.05);           // walkway by porches
   [roomXs[0]+RW/2-1.5, roomXs[1]+RW/2-1.5, roomXs[2]+RW/2-1.5].forEach(function(gx) {
-    pavedArea(gx, 28, 3, 10, 0.04);
+    pavedArea(gx, 28, 3, 10, 0.04);          // gate paths
   });
 
-  // ── GARDEN TEXTURE + BEDS ──
-  var MSoil = new THREE.MeshPhongMaterial({color: 0x5A4030, shininess: 2});
-  var MEdge = new THREE.MeshPhongMaterial({color: 0x6A5A48, shininess: 3});
+  // ── FRONT FLOWER BEDS (elegant raised beds with stone edging) ──
+  var MBedStone = new THREE.MeshPhongMaterial({color: 0x9A9088, shininess: 6});
+  var MBedSoil = new THREE.MeshPhongMaterial({color: 0x4A3828, shininess: 2});
+  var flowerColors = [0xE83830, 0xF09030, 0xF0B030, 0xD06838, 0xE05050, 0xCC3366, 0xFF6699];
 
-  function makeGrassTexture() {
-    var c = document.createElement('canvas');
-    var s = 256; c.width = s; c.height = s;
-    var ctx = c.getContext('2d');
-    ctx.fillStyle = '#5AAA30'; ctx.fillRect(0,0,s,s);
-    // Grass blade variation
-    var greens = ['#4A9828','#6AB838','#72C040','#58A830','#3E8A22','#68B435'];
-    var _gs = 17;
-    function gsrand() { _gs = (_gs * 16807) % 2147483647; return (_gs-1)/2147483646; }
-    for(var i=0; i<800; i++) {
-      ctx.fillStyle = greens[i % greens.length];
-      var gx = gsrand()*s, gy = gsrand()*s;
-      ctx.fillRect(gx, gy, 1.5+gsrand()*3, 4+gsrand()*8);
+  function flowerBed(cx, cz, w, d) {
+    // Low stone border (neat rectangle, 0.4ft tall)
+    bx(w, 0.4, 0.2, MBedStone, cx, 0.2, cz - d/2);
+    bx(w, 0.4, 0.2, MBedStone, cx, 0.2, cz + d/2);
+    bx(0.2, 0.4, d, MBedStone, cx - w/2, 0.2, cz);
+    bx(0.2, 0.4, d, MBedStone, cx + w/2, 0.2, cz);
+    // Dark soil fill inside
+    bx(w-0.4, 0.25, d-0.4, MBedSoil, cx, 0.12, cz);
+    // Flowers — small colourful spheres in a gentle pattern
+    var _fs = Math.floor(cx * 7 + cz * 13) + 42;
+    function fr() { _fs = (_fs * 16807) % 2147483647; return (_fs-1)/2147483646; }
+    var count = Math.floor(w * d * 0.8);
+    for(var fi=0; fi<count; fi++) {
+      var fx = cx - w/2 + 0.4 + fr()*(w-0.8);
+      var fz = cz - d/2 + 0.4 + fr()*(d-0.8);
+      var fc = flowerColors[fi % flowerColors.length];
+      var fm = new THREE.Mesh(
+        new THREE.SphereGeometry(0.25 + fr()*0.2, 6, 5),
+        new THREE.MeshPhongMaterial({color: fc})
+      );
+      fm.position.set(fx, 0.35 + fr()*0.15, fz);
+      fm.scale.y = 0.6;
+      fm.castShadow = true; scene.add(fm);
     }
-    // Dark patches
-    for(var j=0; j<40; j++) {
-      ctx.fillStyle = 'rgba(30,60,10,0.15)';
-      ctx.beginPath();
-      ctx.arc(gsrand()*s, gsrand()*s, 8+gsrand()*16, 0, Math.PI*2);
-      ctx.fill();
-    }
-    var tex = new THREE.CanvasTexture(c);
-    tex.wrapS = THREE.RepeatWrapping;
-    tex.wrapT = THREE.RepeatWrapping;
-    return tex;
-  }
-
-  function gardenBed(cx, cz, w, d, hasSoilRows) {
-    // Textured grass surface
-    var gtex = makeGrassTexture();
-    gtex.repeat.set(w/6, d/6);
-    var gmat = new THREE.MeshPhongMaterial({map: gtex, shininess: 2});
-    var gm = new THREE.Mesh(new THREE.BoxGeometry(w, 0.5, d), gmat);
-    gm.position.set(cx, -0.15, cz);
-    gm.receiveShadow = true; scene.add(gm);
-    // Edging stones
-    bx(w+0.3, 0.45, 0.3, MEdge, cx, -0.08, cz - d/2);
-    bx(w+0.3, 0.45, 0.3, MEdge, cx, -0.08, cz + d/2);
-    bx(0.3, 0.45, d, MEdge, cx - w/2, -0.08, cz);
-    bx(0.3, 0.45, d, MEdge, cx + w/2, -0.08, cz);
-    // Soil planting rows
-    if(hasSoilRows) {
-      for(var rz = cz - d/2 + 1.5; rz < cz + d/2 - 1; rz += 2.5) {
-        bx(w-1.5, 0.25, 0.5, MSoil, cx, 0.15, rz);
-      }
+    // A few green leaf clusters between flowers
+    for(var li=0; li<count*0.4; li++) {
+      var lx = cx - w/2 + 0.5 + fr()*(w-1);
+      var lz = cz - d/2 + 0.5 + fr()*(d-1);
+      var lm = new THREE.Mesh(
+        new THREE.SphereGeometry(0.3 + fr()*0.2, 5, 4),
+        new THREE.MeshPhongMaterial({color: 0x3A8A22})
+      );
+      lm.position.set(lx, 0.25, lz);
+      lm.scale.y = 0.45;
+      scene.add(lm);
     }
   }
 
-  // Back garden
-  gardenBed(0, -18, 56, 28, true);
-
-  // Side gardens
-  gardenBed(-37, 3, 16, 70, false);
-  gardenBed( 37, 3, 16, 70, false);
-
-  // Front garden patches (between paths)
-  gardenBed(-18, 25, 7, 6, true);
-  gardenBed( -5, 25, 8, 6, true);
-  gardenBed( 10, 25, 8, 6, true);
+  // Three neat flower beds in the front garden area (between paths)
+  flowerBed(-18, 25, 6, 4);
+  flowerBed( -5, 25, 7, 4);
+  flowerBed( 10, 25, 7, 4);
 
   // Room + porch floors
   roomXs.forEach(function(rx) {
@@ -551,14 +551,17 @@
   cyl(3.8, 3.8, 0.7, 24, MCgInner, 0, 0.35, -16);
   cyl(1.5, 1.5, 0.8, 16, MCgCenter, 0, 0.4, -16);
 
-  // ── BACK GARDEN PATH (stone path to circular feature) ──
-  bx(2.5, 0.5, 14, MPv, 0, -0.18, -8);
+  // ── BACK GARDEN PATH (stepping stones to circular feature) ──
+  var MStepping = new THREE.MeshPhongMaterial({color: 0xB8AEA0, shininess: 5});
+  for(var sp = -1; sp >= -14; sp -= 2.5) {
+    cyl(0.7, 0.7, 0.15, 12, MStepping, 0, 0.07, sp);
+  }
 
-  // ── PLOT BOUNDARY FENCE (low, subtle) ──
-  var MFnc = new THREE.MeshPhongMaterial({color: 0x7A9A60, shininess: 3});
-  bx(100, 1.0, 0.3, MFnc, 0, 0.5, -33);  // back fence
-  bx(0.3, 1.0, 68, MFnc, -50, 0.5, 1);    // left fence
-  bx(0.3, 1.0, 68, MFnc, 50, 0.5, 1);     // right fence
+  // ── PLOT BOUNDARY WALL (5ft sandcrete, plastered and painted) ──
+  var MFnc = new THREE.MeshPhongMaterial({color: 0xE8E0D4, shininess: 4});
+  bx(100, 5, 0.42, MFnc, 0, 2.5, -37);  // back wall
+  bx(0.42, 5, 80, MFnc, -50, 2.5, -1);  // left wall
+  bx(0.42, 5, 80, MFnc, 50, 2.5, -1);   // right wall
 
   // ── TREES ──
   function tree(x,z,h,r) {
