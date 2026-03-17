@@ -49,7 +49,7 @@
   }
   #c3d:active { cursor: grabbing; }
   #hint {
-    position: absolute;
+    position: fixed;
     bottom: 18px;
     left: 50%;
     transform: translateX(-50%);
@@ -61,14 +61,16 @@
     pointer-events: none;
     white-space: nowrap;
     letter-spacing: 0.04em;
+    z-index: 10;
   }
   #views {
-    position: absolute;
-    top: 14px;
+    position: fixed;
+    top: 66px;
     right: 14px;
     display: flex;
     flex-direction: column;
     gap: 5px;
+    z-index: 10;
   }
   #views button {
     padding: 6px 14px;
@@ -85,13 +87,14 @@
   #views button:hover { background: rgba(255,255,255,0.2); }
   #views button.active { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.4); }
   #info {
-    position: absolute;
-    top: 14px;
+    position: fixed;
+    top: 66px;
     left: 14px;
     font-size: 10px;
     color: rgba(255,255,255,0.4);
     letter-spacing: 0.05em;
     line-height: 1.7;
+    z-index: 10;
   }
 </style>
 </head>
@@ -115,7 +118,7 @@
   </div>
   <div id="info">
     Rooms: 3 × 15 ft square<br>
-    Porches: 3 × 15 × 8 ft<br>
+    Porches: 3 × 15 × 6 ft<br>
     Bath/WC: 10.5 × 23 ft<br>
     Flat concrete slab roof<br>
     Plot: 100 × 80 ft with gardens
@@ -204,8 +207,11 @@
     m.castShadow = true; scene.add(m); return m;
   }
 
-  // ── Building constants ──
-  var RW=15, RD=15, PD=8, BW=10.5, WH=10, WT=0.55;
+  // ── Building constants (Ghana standards) ──
+  // WT: 6" sandcrete block + plaster both sides = 7" ≈ 0.58ft
+  // WH: 10ft floor-to-ceiling (Ghana tropical standard)
+  // PD: 6ft porch (Ghana typical)
+  var RW=15, RD=15, PD=6, BW=10.5, WH=10, WT=0.58;
   var roomXs = [-20, -5, 10];
   var bathX  = 22.75;
   var TW = 55.5;
@@ -222,80 +228,110 @@
   // Plot ground (main green)
   bx(100, 0.5, 80, MGr, 0, -0.25, 3);
 
-  // ── PAVING BLOCK HELPER ──
-  // Lays individual blocks in a grid with gaps to simulate interlocking pavers
-  var MBk1 = new THREE.MeshPhongMaterial({color: 0xC8BAA0, shininess: 4});
-  var MBk2 = new THREE.MeshPhongMaterial({color: 0xD4C6AC, shininess: 4});
-  var MBk3 = new THREE.MeshPhongMaterial({color: 0xBCAE96, shininess: 4});
-  var MBkEdge = new THREE.MeshPhongMaterial({color: 0x8A7E6E, shininess: 5});
-  var blockMats = [MBk1, MBk2, MBk3];
-
-  function pavingBlocks(cx, cz, areaW, areaD, blockW, blockD, gap, y) {
-    // Edge border
-    bx(areaW+0.4, 0.45, 0.35, MBkEdge, cx, y-0.05, cz - areaD/2);
-    bx(areaW+0.4, 0.45, 0.35, MBkEdge, cx, y-0.05, cz + areaD/2);
-    bx(0.35, 0.45, areaD, MBkEdge, cx - areaW/2, y-0.05, cz);
-    bx(0.35, 0.45, areaD, MBkEdge, cx + areaW/2, y-0.05, cz);
-    // Individual blocks
-    var startX = cx - areaW/2 + blockW/2 + 0.3;
-    var startZ = cz - areaD/2 + blockD/2 + 0.3;
-    var idx = 0;
-    for(var bz = startZ; bz < cz + areaD/2 - 0.3; bz += blockD + gap) {
-      var rowOff = (idx % 2 === 1) ? (blockW + gap) * 0.5 : 0;
-      for(var bxx = startX + rowOff; bxx < cx + areaW/2 - 0.3; bxx += blockW + gap) {
-        var mat = blockMats[(idx + Math.floor(bxx * 3.7)) % 3];
-        bx(blockW, 0.35, blockD, mat, bxx, y, bz);
+  // ── PAVING BLOCK TEXTURE ──
+  // Ghana standard: 200×100mm (0.66×0.33ft) interlocking pavers, 60mm thick
+  function makePaverTexture() {
+    var c = document.createElement('canvas');
+    // Each tile = 4×4 ft of real paving, drawn at high res
+    var s = 256; c.width = s; c.height = s;
+    var ctx = c.getContext('2d');
+    // Block dimensions in pixels (0.66ft and 0.33ft mapped to 4ft tile)
+    var bw = s * (0.66/4); // ~42px per block length
+    var bh = s * (0.33/4); // ~21px per block width
+    var gap = 1.5;
+    var colors = ['#C8BAA0','#D0C2A8','#BCAE96','#C4B69C','#D4C8B0','#B8AA90'];
+    ctx.fillStyle = '#706858'; ctx.fillRect(0,0,s,s); // joint/sand color
+    var ci = 0;
+    for(var row=0, ry=0; ry < s+bh; row++, ry += bh+gap) {
+      var off = (row % 2 === 1) ? (bw+gap)*0.5 : 0;
+      for(var rx = -bw+off; rx < s+bw; rx += bw+gap) {
+        ctx.fillStyle = colors[ci % colors.length]; ci++;
+        ctx.fillRect(rx, ry, bw-gap, bh-gap);
+        // Subtle shade variation
+        ctx.fillStyle = 'rgba(0,0,0,0.04)';
+        ctx.fillRect(rx, ry+bh*0.7, bw-gap, bh*0.3-gap);
       }
-      idx++;
     }
+    var tex = new THREE.CanvasTexture(c);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    return tex;
   }
 
-  // ── PAVED AREAS WITH BLOCKS ──
+  function pavedArea(cx, cz, w, d, y) {
+    var tex = makePaverTexture();
+    // Repeat so each 4ft of world = one texture tile
+    tex.repeat.set(w/4, d/4);
+    var mat = new THREE.MeshPhongMaterial({map: tex, shininess: 4});
+    var m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.2, d), mat);
+    m.position.set(cx, y, cz);
+    m.receiveShadow = true; scene.add(m);
+    // Concrete kerb edging (0.33ft wide ≈ 4" kerb)
+    var MKerb = new THREE.MeshPhongMaterial({color: 0x8A7E6E, shininess: 5});
+    bx(w+0.5, 0.35, 0.25, MKerb, cx, y-0.02, cz - d/2);
+    bx(w+0.5, 0.35, 0.25, MKerb, cx, y-0.02, cz + d/2);
+    bx(0.25, 0.35, d, MKerb, cx - w/2, y-0.02, cz);
+    bx(0.25, 0.35, d, MKerb, cx + w/2, y-0.02, cz);
+  }
+
+  // ── PAVED AREAS ──
   // Entry area (wide strip in front)
-  pavingBlocks(0, 33, TW+4, 5, 1.8, 0.9, 0.12, 0.05);
-
+  pavedArea(0, 33, TW+4, 5, 0.05);
   // Walkway connecting porches
-  pavingBlocks(0, 24, TW+2, 3, 1.8, 0.9, 0.12, 0.05);
-
+  pavedArea(0, 22, TW+2, 3, 0.05);
   // Paths from gates to street
   [roomXs[0]+RW/2-1.5, roomXs[1]+RW/2-1.5, roomXs[2]+RW/2-1.5].forEach(function(gx) {
-    pavingBlocks(gx, 28, 3, 10, 1.4, 0.7, 0.1, 0.04);
+    pavedArea(gx, 28, 3, 10, 0.04);
   });
 
-  // ── GARDEN BEDS WITH DETAIL ──
+  // ── GARDEN TEXTURE + BEDS ──
   var MSoil = new THREE.MeshPhongMaterial({color: 0x5A4030, shininess: 2});
   var MEdge = new THREE.MeshPhongMaterial({color: 0x6A5A48, shininess: 3});
-  var MGrass1 = new THREE.MeshPhongMaterial({color: 0x5CAA30, shininess: 2});
-  var MGrass2 = new THREE.MeshPhongMaterial({color: 0x72B840, shininess: 2});
-  var MGrass3 = new THREE.MeshPhongMaterial({color: 0x4A9828, shininess: 2});
 
-  // Simple seeded random for consistent garden layout
-  var _seed = 42;
-  function srand() { _seed = (_seed * 16807 + 0) % 2147483647; return (_seed - 1) / 2147483646; }
+  function makeGrassTexture() {
+    var c = document.createElement('canvas');
+    var s = 256; c.width = s; c.height = s;
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#5AAA30'; ctx.fillRect(0,0,s,s);
+    // Grass blade variation
+    var greens = ['#4A9828','#6AB838','#72C040','#58A830','#3E8A22','#68B435'];
+    var _gs = 17;
+    function gsrand() { _gs = (_gs * 16807) % 2147483647; return (_gs-1)/2147483646; }
+    for(var i=0; i<800; i++) {
+      ctx.fillStyle = greens[i % greens.length];
+      var gx = gsrand()*s, gy = gsrand()*s;
+      ctx.fillRect(gx, gy, 1.5+gsrand()*3, 4+gsrand()*8);
+    }
+    // Dark patches
+    for(var j=0; j<40; j++) {
+      ctx.fillStyle = 'rgba(30,60,10,0.15)';
+      ctx.beginPath();
+      ctx.arc(gsrand()*s, gsrand()*s, 8+gsrand()*16, 0, Math.PI*2);
+      ctx.fill();
+    }
+    var tex = new THREE.CanvasTexture(c);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+  }
 
   function gardenBed(cx, cz, w, d, hasSoilRows) {
-    // Raised bed with visible border
-    bx(w, 0.6, d, MGrDark, cx, -0.15, cz);
-    // Edging stones around border
-    bx(w+0.3, 0.5, 0.3, MEdge, cx, -0.1, cz - d/2);
-    bx(w+0.3, 0.5, 0.3, MEdge, cx, -0.1, cz + d/2);
-    bx(0.3, 0.5, d, MEdge, cx - w/2, -0.1, cz);
-    bx(0.3, 0.5, d, MEdge, cx + w/2, -0.1, cz);
-    // Grass tufts
-    var grassMats = [MGrass1, MGrass2, MGrass3];
-    for(var gi=0; gi<Math.floor(w*d/4); gi++) {
-      var gx = cx - w/2 + 0.5 + srand()*(w-1);
-      var gz = cz - d/2 + 0.5 + srand()*(d-1);
-      var gr = 0.25 + srand()*0.35;
-      var m = new THREE.Mesh(new THREE.SphereGeometry(gr, 5, 4), grassMats[gi%3]);
-      m.scale.y = 0.4;
-      m.position.set(gx, 0.15, gz);
-      scene.add(m);
-    }
+    // Textured grass surface
+    var gtex = makeGrassTexture();
+    gtex.repeat.set(w/6, d/6);
+    var gmat = new THREE.MeshPhongMaterial({map: gtex, shininess: 2});
+    var gm = new THREE.Mesh(new THREE.BoxGeometry(w, 0.5, d), gmat);
+    gm.position.set(cx, -0.15, cz);
+    gm.receiveShadow = true; scene.add(gm);
+    // Edging stones
+    bx(w+0.3, 0.45, 0.3, MEdge, cx, -0.08, cz - d/2);
+    bx(w+0.3, 0.45, 0.3, MEdge, cx, -0.08, cz + d/2);
+    bx(0.3, 0.45, d, MEdge, cx - w/2, -0.08, cz);
+    bx(0.3, 0.45, d, MEdge, cx + w/2, -0.08, cz);
     // Soil planting rows
     if(hasSoilRows) {
       for(var rz = cz - d/2 + 1.5; rz < cz + d/2 - 1; rz += 2.5) {
-        bx(w-1.5, 0.3, 0.6, MSoil, cx, 0.18, rz);
+        bx(w-1.5, 0.25, 0.5, MSoil, cx, 0.15, rz);
       }
     }
   }
@@ -308,9 +344,9 @@
   gardenBed( 37, 3, 16, 70, false);
 
   // Front garden patches (between paths)
-  gardenBed(-18, 27, 7, 8, true);
-  gardenBed( -5, 27, 8, 8, true);
-  gardenBed( 10, 27, 8, 8, true);
+  gardenBed(-18, 25, 7, 6, true);
+  gardenBed( -5, 25, 8, 6, true);
+  gardenBed( 10, 25, 8, 6, true);
 
   // Room + porch floors
   roomXs.forEach(function(rx) {
@@ -319,33 +355,47 @@
   });
 
   // ── BACK WALL — each room ──
+  // Ghana standard: 4ft wide × 4ft high window, sill at 3ft, head at 7ft
+  var winW = 4, winH = 4, sillH = 3, headH = 7;
   roomXs.forEach(function(rx) {
-    var pw = RW*0.19;
-    // side piers
-    bx(pw, WH, WT, MW, rx-RW/2+pw/2, WH/2, 0);
-    bx(pw, WH, WT, MW, rx+RW/2-pw/2, WH/2, 0);
-    // above window
-    bx(RW-pw*2, WH*0.28, WT, MW, rx, WH-WH*0.14, 0);
-    // below window sill
-    bx(RW-pw*2, WH*0.18, WT, MW, rx, WH*0.09, 0);
-    // glass
-    bx(RW-pw*2-0.2, WH*0.54, 0.1, MG, rx, WH*0.18+WH*0.54/2, 0.06);
-    // frame
-    bx(RW-pw*2, WH*0.54+0.25, 0.08, MF, rx, WH*0.18+WH*0.54/2, 0.04);
-    // mullion
-    bx(0.15, WH*0.54, 0.12, MF, rx, WH*0.18+WH*0.54/2, 0.07);
-    // brise-soleil cap
-    bx(RW-pw*2+0.4, 0.38, 0.95, MFn, rx, WH-WH*0.28+0.2, -0.48);
-    // fins
-    for(var f=0;f<5;f++) {
-      bx(0.16, 0.7, 0.78, MFn, rx-RW*0.25+f*(RW*0.5/4), WH-WH*0.28-0.15, -0.4);
+    // Wall below sill
+    bx(RW, sillH, WT, MW, rx, sillH/2, 0);
+    // Wall above head
+    bx(RW, WH-headH, WT, MW, rx, headH+(WH-headH)/2, 0);
+    // Wall left of window
+    var sideW = (RW - winW) / 2;
+    bx(sideW, winH, WT, MW, rx - winW/2 - sideW/2, sillH + winH/2, 0);
+    // Wall right of window
+    bx(sideW, winH, WT, MW, rx + winW/2 + sideW/2, sillH + winH/2, 0);
+    // Glass (4ft × 4ft louvre window)
+    bx(winW-0.2, winH-0.2, 0.1, MG, rx, sillH + winH/2, 0.06);
+    // Frame
+    bx(winW, winH, 0.08, MF, rx, sillH + winH/2, 0.04);
+    // Mullion (vertical centre bar)
+    bx(0.15, winH, 0.12, MF, rx, sillH + winH/2, 0.07);
+    // Horizontal louvre bars
+    for(var lb=0; lb<4; lb++) {
+      bx(winW-0.3, 0.08, 0.12, MF, rx, sillH+0.5+lb*(winH/4), 0.07);
+    }
+    // Brise-soleil: overhang 1.5ft deep, 0.2ft thick
+    bx(winW+1, 0.2, 1.5, MFn, rx, headH+0.1, -0.75);
+    // Vertical fins: 0.17ft thick, 1ft deep, spaced 1.5ft apart
+    var nFins = Math.floor(winW / 1.5) + 1;
+    var finStart = rx - winW/2;
+    for(var f=0; f<nFins; f++) {
+      bx(0.17, 1.0, 1.0, MFn, finStart + f*1.5, headH-0.5, -0.5);
     }
   });
 
-  // Bath back wall
-  bx(BW, WH, WT, MWB, bathX, WH/2, 0);
-  bx(BW*0.42, WH*0.22, 0.1, MG, bathX, WH*0.74, 0.06);
-  bx(BW*0.42+0.2, WH*0.22+0.2, 0.08, MF, bathX, WH*0.74, 0.04);
+  // Bath back wall — small toilet window: 2ft × 2ft, high placement
+  var bWinW = 2, bWinH = 2, bSillH = 5;
+  bx(BW, bSillH, WT, MWB, bathX, bSillH/2, 0);
+  bx(BW, WH-(bSillH+bWinH), WT, MWB, bathX, (bSillH+bWinH)+(WH-(bSillH+bWinH))/2, 0);
+  var bSideW = (BW - bWinW) / 2;
+  bx(bSideW, bWinH, WT, MWB, bathX - bWinW/2 - bSideW/2, bSillH + bWinH/2, 0);
+  bx(bSideW, bWinH, WT, MWB, bathX + bWinW/2 + bSideW/2, bSillH + bWinH/2, 0);
+  bx(bWinW-0.15, bWinH-0.15, 0.1, MG, bathX, bSillH + bWinH/2, 0.06);
+  bx(bWinW, bWinH, 0.08, MF, bathX, bSillH + bWinH/2, 0.04);
 
   // ── SIDE WALLS ──
   // Left end
@@ -354,8 +404,10 @@
   var bex = bathX + BW/2 + WT/2;
   bx(WT, WH*0.5, RD+PD, MWB, bex, WH*0.25, (RD+PD)/2);
   bx(WT, WH*0.5, RD+PD, MFl, bex, WH*0.75, (RD+PD)/2);
-  for(var f=0;f<7;f++) {
-    bx(0.48, WH*0.5+0.1, 0.18, MFg, bex+0.38, WH*0.75, 1+f*3.1);
+  // Decorative vertical fins on bath side wall (1.5ft spacing)
+  var finCount = Math.floor((RD+PD-2) / 1.5);
+  for(var f=0; f<finCount; f++) {
+    bx(0.42, WH*0.5+0.1, 0.17, MFg, bex+0.35, WH*0.75, 1+f*1.5);
   }
 
   // ── DIVIDER WALLS (full depth: room + porch) ──
@@ -375,9 +427,10 @@
 
   // Bath front wall
   bx(BW, WH, WT, MWB, bathX, WH/2, RD);
-  // Bath side door
-  bx(WT, WH-7, 3.0, MW, -halfW+3*RW, (WH+7)/2, RD+1.5);
-  bx(2.8, 7, 0.14, MD, -halfW+3*RW-WT, 3.5, RD+2.7);
+  // Bath side door (2.5ft wide × 7ft high — Ghana internal door standard)
+  var bdW = 2.5, bdH = 7;
+  bx(WT, WH-bdH, bdW, MW, -halfW+3*RW, (WH+bdH)/2, RD+bdW/2);
+  bx(bdW-0.2, bdH, 0.14, MD, -halfW+3*RW-WT, bdH/2, RD+bdW/2+0.3);
 
   // ── PORCH FRONT BEAMS ──
   var allX = roomXs.concat([bathX]);
@@ -386,38 +439,44 @@
     bx(allW[i], 0.5, WT, MFn, rx, WH+1.0, RD+PD);
   });
 
-  // ── ROOF SLAB ──
-  bx(TW+2.4, 1.5, RD+PD+2.4, MR, 0, WH+0.75, (RD+PD)/2);
+  // ── ROOF SLAB (0.5ft / 150mm flat concrete — Ghana standard) ──
+  bx(TW+2.4, 0.5, RD+PD+2.4, MR, 0, WH+0.25, (RD+PD)/2);
 
-  // ── PLINTH ──
-  bx(TW+1, 0.9, RD+PD+1, MPl, 0, 0.45, (RD+PD)/2);
+  // ── PLINTH (1.5ft / 450mm above ground — Ghana standard) ──
+  bx(TW+1, 1.5, RD+PD+1, MPl, 0, 0.75, (RD+PD)/2);
 
   // ── PORCH LOW WALLS + GATES ──
+  // Dwarf wall: 3ft high, 5" block + plaster = 0.42ft thick (Ghana standard)
+  // Pedestrian gate: 3ft wide × 6ft high (Ghana standard)
+  var gateW = 3.0, gateH = 6.0;
   roomXs.forEach(function(rx) {
     var xl = rx - RW/2, xr = rx + RW/2;
-    var gx = xr - 1.5;
-    var lh = 3.2, lw = 0.45, fz = RD+PD;
-    // left wall
-    var ls = gx-1.5-xl;
-    bx(ls, lh, lw, MLW, xl+ls/2, lh/2, fz);
-    // right wall
-    var rs = xr-(gx+1.5);
-    if(rs>0.1) bx(rs, lh, lw, MLW, gx+1.5+rs/2, lh/2, fz);
-    // end posts
-    bx(0.6, lh+0.2, lw+0.2, MLW, xl,     (lh+0.2)/2, fz);
-    bx(0.6, lh+0.2, lw+0.2, MLW, xr,     (lh+0.2)/2, fz);
-    bx(0.5, lh+0.15,lw+0.15, MLW, gx-1.5,(lh+0.15)/2,fz);
-    bx(0.5, lh+0.15,lw+0.15, MLW, gx+1.5,(lh+0.15)/2,fz);
-    // gate leaves
-    var g1 = new THREE.Mesh(new THREE.BoxGeometry(1.38,2.65,0.09), MGt);
-    g1.position.set(gx-0.72, 1.32, fz+0.28); g1.rotation.y = 0.32;
+    var gx = xr - gateW/2;  // gate centred on right side of porch
+    var lh = 3.0, lw = 0.42, fz = RD+PD;
+    // left wall segment
+    var ls = gx - gateW/2 - xl;
+    if(ls > 0.1) bx(ls, lh, lw, MLW, xl+ls/2, lh/2, fz);
+    // right wall segment
+    var rs = xr - (gx + gateW/2);
+    if(rs > 0.1) bx(rs, lh, lw, MLW, gx+gateW/2+rs/2, lh/2, fz);
+    // Gate posts (0.5ft square pillars, full gate height)
+    bx(0.5, gateH, 0.5, MLW, gx-gateW/2, gateH/2, fz);
+    bx(0.5, gateH, 0.5, MLW, gx+gateW/2, gateH/2, fz);
+    // End posts at wall corners
+    bx(0.5, lh+0.2, lw+0.15, MLW, xl, (lh+0.2)/2, fz);
+    bx(0.5, lh+0.2, lw+0.15, MLW, xr, (lh+0.2)/2, fz);
+    // Gate leaves (two leaves, each 1.5ft wide × 6ft high)
+    var leafW = gateW/2;
+    var g1 = new THREE.Mesh(new THREE.BoxGeometry(leafW-0.1, gateH-0.2, 0.08), MGt);
+    g1.position.set(gx-leafW/2, gateH/2, fz+0.25); g1.rotation.y = 0.3;
     g1.castShadow = true; scene.add(g1);
-    var g2 = new THREE.Mesh(new THREE.BoxGeometry(1.38,2.65,0.09), MGt);
-    g2.position.set(gx+0.72, 1.32, fz+0.28); g2.rotation.y = -0.32;
+    var g2 = new THREE.Mesh(new THREE.BoxGeometry(leafW-0.1, gateH-0.2, 0.08), MGt);
+    g2.position.set(gx+leafW/2, gateH/2, fz+0.25); g2.rotation.y = -0.3;
     g2.castShadow = true; scene.add(g2);
-    // gate rails
-    bx(0.08, 0.12, 2.95, MGt, gx, 0.9,  fz+0.28);
-    bx(0.08, 0.12, 2.95, MGt, gx, 2.1,  fz+0.28);
+    // Gate horizontal rails
+    bx(0.06, 0.1, gateW-0.2, MGt, gx, gateH*0.25, fz+0.25);
+    bx(0.06, 0.1, gateW-0.2, MGt, gx, gateH*0.5,  fz+0.25);
+    bx(0.06, 0.1, gateW-0.2, MGt, gx, gateH*0.75, fz+0.25);
   });
 
   // ── CIRCULAR GARDEN FEATURE (back garden) ──
@@ -525,7 +584,7 @@
     applyCamera();
   });
   el.addEventListener('wheel', function(e){
-    orbit.r = Math.max(18, Math.min(220, orbit.r+e.deltaY*0.1));
+    orbit.r = Math.max(8, Math.min(220, orbit.r+e.deltaY*0.4));
     applyCamera(); e.preventDefault();
   }, {passive:false});
 
