@@ -557,11 +557,62 @@
     cyl(0.7, 0.7, 0.15, 12, MStepping, 0, 0.07, sp);
   }
 
-  // ── PLOT BOUNDARY WALL (5ft sandcrete, plastered and painted) ──
-  var MFnc = new THREE.MeshPhongMaterial({color: 0xE8E0D4, shininess: 4});
-  bx(100, 5, 0.42, MFnc, 0, 2.5, -37);  // back wall
-  bx(0.42, 5, 80, MFnc, -50, 2.5, -1);  // left wall
-  bx(0.42, 5, 80, MFnc, 50, 2.5, -1);   // right wall
+  // ── PLOT BOUNDARY — CYPRESS TREE LINE ──
+  // Italian Cypress (Cupressus sempervirens) — tall, slender, conical
+  // Spaced ~8ft apart for a formal, elegant boundary
+  var MCyTrunk = new THREE.MeshPhongMaterial({color: 0x5A4A30, shininess: 3});
+  var MCy1 = new THREE.MeshPhongMaterial({color: 0x1E5418, shininess: 2});
+  var MCy2 = new THREE.MeshPhongMaterial({color: 0x24601A, shininess: 2});
+  var MCy3 = new THREE.MeshPhongMaterial({color: 0x204E16, shininess: 2});
+
+  function cypress(x, z) {
+    // Slight natural variation in height (14–17ft)
+    var seed = Math.abs(Math.floor(x * 7.3 + z * 11.7));
+    var h = 14 + (seed % 4);
+    var mats = [MCy1, MCy2, MCy3];
+    var mat = mats[seed % 3];
+
+    // Thin trunk (barely visible inside foliage)
+    cyl(0.15, 0.2, h * 0.3, 6, MCyTrunk, x, h * 0.15, z);
+
+    // Conical foliage built from stacked cones (wide base, narrow tip)
+    // 5 overlapping cone sections for dense, layered look
+    var sections = 5;
+    for(var i = 0; i < sections; i++) {
+      var t = i / sections;
+      var baseY = h * 0.12 + t * h * 0.75;
+      var sectionH = h * 0.35;
+      var botR = 1.6 * (1 - t * 0.7);   // wide at bottom, narrow at top
+      var topR = 1.2 * (1 - (t + 0.2) * 0.7);
+      if(topR < 0.15) topR = 0.15;
+      var cm = mats[(seed + i) % 3];
+      cyl(topR, botR, sectionH, 8, cm, x, baseY + sectionH/2, z);
+    }
+    // Pointed tip
+    cyl(0, 0.3, h * 0.12, 6, mat, x, h * 0.93, z);
+  }
+
+  // Back boundary (z = -37) — double row, staggered
+  for(var bx_ = -48; bx_ <= 48; bx_ += 4) {
+    cypress(bx_, -37);
+  }
+  for(var bx2 = -46; bx2 <= 48; bx2 += 4) {
+    cypress(bx2, -40);
+  }
+  // Left boundary (x = -50) — double row, staggered
+  for(var lz = -33; lz <= 35; lz += 4) {
+    cypress(-50, lz);
+  }
+  for(var lz2 = -31; lz2 <= 35; lz2 += 4) {
+    cypress(-53, lz2);
+  }
+  // Right boundary (x = 50) — double row, staggered
+  for(var rz = -33; rz <= 35; rz += 4) {
+    cypress(50, rz);
+  }
+  for(var rz2 = -31; rz2 <= 35; rz2 += 4) {
+    cypress(53, rz2);
+  }
 
   // ── TREES ──
   function tree(x,z,h,r) {
@@ -573,11 +624,9 @@
   // Back garden trees
   tree(-15, -18, 9, 5.2);
   tree( 17, -18, 9, 5.2);
-  // Side garden trees
-  tree(-37, -10, 7, 4.0);
-  tree(-37,  12, 6, 3.4);
-  tree( 37, -10, 7, 4.0);
-  tree( 37,  12, 5, 2.9);
+  // Side garden accent trees (set in from boundary)
+  tree(-40, 0, 7, 4.0);
+  tree( 40, 0, 6, 3.4);
 
   // ── SHRUBS ──
   function shrub(x,z,r) {
@@ -591,14 +640,9 @@
     shrub(gx-2.3, 26, 1.1); shrub(gx+2.3, 26, 1.1);
     shrub(rx-RW/2+1.2, 25.5, 0.85);
   });
-  // Side garden shrubs
-  shrub(-37, -2, 1.4); shrub(-37, 5, 1.4);
-  shrub( 37, -2, 1.4); shrub( 37, 5, 1.4);
-  // Hedge rows along side gardens
-  for(var si=-20; si<=15; si+=4) {
-    shrub(-46, si, 1.0);
-    shrub( 46, si, 1.0);
-  }
+  // Side garden shrubs (between house and tree line)
+  shrub(-40, -12, 1.4); shrub(-40, 12, 1.4);
+  shrub( 40, -12, 1.4); shrub( 40, 12, 1.4);
 
   // ── FLOWERS ──
   var fC = [0xE83830,0xF09030,0xF0B030,0xD06838,0xE05050];
