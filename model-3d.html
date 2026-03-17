@@ -120,8 +120,10 @@
     Rooms: 3 × 15 ft square<br>
     Porches: 3 × 15 × 6 ft<br>
     Bath/WC: 10.5 × 23 ft<br>
-    Flat concrete slab roof<br>
-    Plot: 100 × 80 ft with gardens
+    Ventilated double roof<br>
+    Breeze block ventilation<br>
+    4ft deep overhangs<br>
+    Plot: 100 × 80 ft
   </div>
 </div>
 
@@ -167,7 +169,11 @@
   // ── Materials ──
   var MW  = new THREE.MeshPhongMaterial({color: 0xF0EBE1, shininess: 5});
   var MWB = new THREE.MeshPhongMaterial({color: 0xECF0F2, shininess: 5});
-  var MR  = new THREE.MeshPhongMaterial({color: 0x222018, shininess: 6});
+  var MR  = new THREE.MeshPhongMaterial({color: 0x555550, shininess: 6}); // concrete slab (grey)
+  var MRw = new THREE.MeshPhongMaterial({color: 0xF0F0EC, shininess: 30}); // white metal roof sheet
+  var MRs = new THREE.MeshPhongMaterial({color: 0x606058, shininess: 10}); // steel supports
+  var MBB = new THREE.MeshPhongMaterial({color: 0xD8D0C4, shininess: 4}); // breeze blocks
+  var MPar= new THREE.MeshPhongMaterial({color: 0xE8E2D8, shininess: 5}); // parapet wall
   var MG  = new THREE.MeshPhongMaterial({color: 0x9ECCDE, transparent: true, opacity: 0.58, shininess: 120});
   var MF  = new THREE.MeshPhongMaterial({color: 0x3A3836, shininess: 10});
   var MFn = new THREE.MeshPhongMaterial({color: 0x2A2826, shininess: 8});
@@ -354,14 +360,38 @@
     bx(RW-WT*2, 0.35, PD-0.3, MflW, rx, 0.17, RD+PD/2-0.15);
   });
 
+  // ── BREEZE BLOCK HELPER ──
+  // Decorative perforated concrete blocks — 2ft band near ceiling for ventilation
+  var bbH = 2; // breeze block band height
+  var bbY = WH - bbH; // starts at 8ft (just above window head at 7ft)
+
+  function breezeBlockBand(cx, cz, w, zOff) {
+    // Thin wall strip with perforations (diamond pattern)
+    // Solid frame top and bottom
+    bx(w, 0.25, WT, MBB, cx, bbY, cz);         // bottom rail
+    bx(w, 0.25, WT, MBB, cx, WH - 0.12, cz);   // top rail
+    // Vertical posts at ends and intervals
+    var postSpacing = 1.5;
+    var startX = cx - w/2;
+    for(var px = startX; px <= cx + w/2 + 0.01; px += postSpacing) {
+      bx(0.15, bbH, WT, MBB, px, bbY + bbH/2, cz);
+    }
+    // Diamond/cross pattern infill — horizontal bars at mid-height for pattern
+    bx(w, 0.12, WT*0.5, MBB, cx, bbY + bbH*0.33, cz + zOff);
+    bx(w, 0.12, WT*0.5, MBB, cx, bbY + bbH*0.66, cz + zOff);
+  }
+
   // ── BACK WALL — each room ──
   // Ghana standard: 4ft wide × 4ft high window, sill at 3ft, head at 7ft
+  // Upper 2ft is breeze block band for ventilation
   var winW = 4, winH = 4, sillH = 3, headH = 7;
   roomXs.forEach(function(rx) {
     // Wall below sill
     bx(RW, sillH, WT, MW, rx, sillH/2, 0);
-    // Wall above head
-    bx(RW, WH-headH, WT, MW, rx, headH+(WH-headH)/2, 0);
+    // Solid wall between head and breeze block band (7ft to 8ft = 1ft)
+    bx(RW, bbY - headH, WT, MW, rx, headH + (bbY-headH)/2, 0);
+    // Breeze block band (8ft to 10ft)
+    breezeBlockBand(rx, 0, RW, -0.05);
     // Wall left of window
     var sideW = (RW - winW) / 2;
     bx(sideW, winH, WT, MW, rx - winW/2 - sideW/2, sillH + winH/2, 0);
@@ -387,10 +417,12 @@
     }
   });
 
-  // Bath back wall — small toilet window: 2ft × 2ft, high placement
+  // Bath back wall — small toilet window + breeze block band
   var bWinW = 2, bWinH = 2, bSillH = 5;
   bx(BW, bSillH, WT, MWB, bathX, bSillH/2, 0);
-  bx(BW, WH-(bSillH+bWinH), WT, MWB, bathX, (bSillH+bWinH)+(WH-(bSillH+bWinH))/2, 0);
+  // Solid between window head and breeze band
+  bx(BW, bbY-(bSillH+bWinH), WT, MWB, bathX, (bSillH+bWinH)+(bbY-(bSillH+bWinH))/2, 0);
+  breezeBlockBand(bathX, 0, BW, -0.05);
   var bSideW = (BW - bWinW) / 2;
   bx(bSideW, bWinH, WT, MWB, bathX - bWinW/2 - bSideW/2, bSillH + bWinH/2, 0);
   bx(bSideW, bWinH, WT, MWB, bathX + bWinW/2 + bSideW/2, bSillH + bWinH/2, 0);
@@ -411,26 +443,48 @@
   }
 
   // ── DIVIDER WALLS (full depth: room + porch) ──
-  bx(WT, WH, RD+PD, MW, -halfW+RW,   WH/2, (RD+PD)/2);
-  bx(WT, WH, RD+PD, MW, -halfW+2*RW, WH/2, (RD+PD)/2);
-  bx(WT, WH, RD+PD, MW, -halfW+3*RW, WH/2, (RD+PD)/2);
+  // Transom opening: 4ft wide × 1.5ft high gap above door head (7ft to 8.5ft)
+  // Allows cross-ventilation between rooms even with doors closed
+  var transW = 4, transH = 1.5, transBot = 7;
+  [-halfW+RW, -halfW+2*RW, -halfW+3*RW].forEach(function(wx) {
+    // Wall below transom (0 to 7ft)
+    bx(WT, transBot, RD+PD, MW, wx, transBot/2, (RD+PD)/2);
+    // Wall above transom (8.5ft to 10ft)
+    bx(WT, WH-(transBot+transH), RD+PD, MW, wx, (transBot+transH)+(WH-(transBot+transH))/2, (RD+PD)/2);
+    // Wall left of transom opening
+    var transCz = RD/2; // centred in room depth
+    var wallSideD = (RD - transW) / 2;
+    bx(WT, transH, wallSideD, MW, wx, transBot+transH/2, wallSideD/2);
+    bx(WT, transH, wallSideD, MW, wx, transBot+transH/2, RD - wallSideD/2);
+    // Porch section of wall (full height, no transom)
+    bx(WT, WH, PD, MW, wx, WH/2, RD + PD/2);
+    // Transom frame/grille
+    bx(WT+0.05, 0.12, transW, MF, wx, transBot, transCz);
+    bx(WT+0.05, 0.12, transW, MF, wx, transBot+transH, transCz);
+    // Vertical bars in transom (for security)
+    for(var tv = -transW/2+0.5; tv <= transW/2-0.3; tv += 0.5) {
+      bx(WT+0.03, transH, 0.06, MF, wx, transBot+transH/2, transCz+tv);
+    }
+  });
 
-  // ── FRONT WALLS (room/porch dividers with door + window) ──
+  // ── FRONT WALLS (room/porch dividers with door + window + breeze blocks) ──
   // Door: 3ft wide × 7ft high (right-aligned)
   // Window: 4ft wide × 4ft high, sill at 3ft (centred in remaining wall)
+  // Breeze block band: 8ft to 10ft (above window/door head)
   roomXs.forEach(function(rx) {
     var xl = rx - RW/2, xr = rx + RW/2;
     var dw = 3.0, dh = 7;
-    var fwW = winW; // 4ft window
-    var fwH = winH; // 4ft window
-    // Wall section widths: [left pier | window | mid pier | door | right edge]
-    var wallLeft = RW - dw - WT; // wall area left of door
-    var winCx = xl + wallLeft/2; // centre window in that area
+    var fwW = winW;
+    var fwH = winH;
+    var wallLeft = RW - dw - WT;
+    var winCx = xl + wallLeft/2;
 
     // Below sill (full width left of door)
     bx(wallLeft, sillH, WT, MW, xl + wallLeft/2, sillH/2, RD);
-    // Above head (full width left of door)
-    bx(wallLeft, WH - headH, WT, MW, xl + wallLeft/2, headH + (WH-headH)/2, RD);
+    // Solid between window head and breeze band (7ft to 8ft)
+    bx(wallLeft, bbY - headH, WT, MW, xl + wallLeft/2, headH + (bbY-headH)/2, RD);
+    // Breeze block band across full room width (8ft to 10ft)
+    breezeBlockBand(rx, RD, RW, 0.05);
     // Left of window
     var lww = (wallLeft - fwW) / 2;
     bx(lww, fwH, WT, MW, xl + lww/2, sillH + fwH/2, RD);
@@ -439,10 +493,10 @@
     // Window glass + frame
     bx(fwW - 0.2, fwH - 0.2, 0.1, MG, winCx, sillH + fwH/2, RD + 0.06);
     bx(fwW, fwH, 0.08, MF, winCx, sillH + fwH/2, RD + 0.04);
-    bx(0.15, fwH, 0.12, MF, winCx, sillH + fwH/2, RD + 0.07); // mullion
+    bx(0.15, fwH, 0.12, MF, winCx, sillH + fwH/2, RD + 0.07);
 
-    // Above door (lintel)
-    bx(dw, WH - dh, WT, MW, xr - dw/2, (WH + dh)/2, RD);
+    // Above door (solid lintel from 7ft to 8ft only)
+    bx(dw, bbY - dh, WT, MW, xr - dw/2, dh + (bbY-dh)/2, RD);
     // Door panel + frame
     bx(dw - 0.25, dh - 0.12, 0.14, MD, xr - dw/2, dh/2, RD + 0.08);
     bx(dw, dh, 0.1, MF, xr - dw/2, dh/2, RD + 0.04);
@@ -462,8 +516,56 @@
     bx(allW[i], 0.5, WT, MFn, rx, WH+1.0, RD+PD);
   });
 
-  // ── ROOF SLAB (0.5ft / 150mm flat concrete — Ghana standard) ──
-  bx(TW+2.4, 0.5, RD+PD+2.4, MR, 0, WH+0.25, (RD+PD)/2);
+  // ── VENTILATED DOUBLE-ROOF SYSTEM ──
+  var overhang = 4.0; // 4ft deep overhang (1200mm — Ghana recommended)
+  var roofW = TW + overhang*2;
+  var roofD = RD + PD + overhang*2;
+  var roofCz = (RD+PD)/2;
+
+  // 1. Concrete ceiling slab (structural, 0.5ft thick, grey)
+  bx(roofW - 2, 0.5, roofD - 2, MR, 0, WH+0.25, roofCz);
+
+  // 2. Parapet wall around slab edge (1.5ft above slab, with vent openings)
+  var parH = 1.5, parTop = WH + 0.5 + parH;
+  var parT = 0.35;
+  // Back parapet (with vent slots)
+  bx(roofW - 2, parH * 0.3, parT, MPar, 0, WH+0.5+parH*0.15, roofCz - roofD/2+1+parT/2);
+  bx(roofW - 2, parH * 0.3, parT, MPar, 0, WH+0.5+parH*0.85, roofCz - roofD/2+1+parT/2);
+  // Front parapet (with vent slots)
+  bx(roofW - 2, parH * 0.3, parT, MPar, 0, WH+0.5+parH*0.15, roofCz + roofD/2-1-parT/2);
+  bx(roofW - 2, parH * 0.3, parT, MPar, 0, WH+0.5+parH*0.85, roofCz + roofD/2-1-parT/2);
+  // Left parapet (solid)
+  bx(parT, parH, roofD - 2, MPar, -(roofW/2-1-parT/2), WH+0.5+parH/2, roofCz);
+  // Right parapet (solid)
+  bx(parT, parH, roofD - 2, MPar, (roofW/2-1-parT/2), WH+0.5+parH/2, roofCz);
+  // Parapet vent posts (vertical dividers in front/back vents)
+  for(var pv = -(roofW/2-1)+3; pv < roofW/2-1; pv += 4) {
+    bx(0.2, parH, parT, MPar, pv, WH+0.5+parH/2, roofCz - roofD/2+1+parT/2);
+    bx(0.2, parH, parT, MPar, pv, WH+0.5+parH/2, roofCz + roofD/2-1-parT/2);
+  }
+
+  // 3. Steel support columns for raised roof (in the air gap)
+  var metalRoofGap = 2.0; // 2ft ventilated cavity
+  var steelY = WH + 0.5; // top of slab
+  var metalRoofY = steelY + parH + metalRoofGap;
+  // Support posts at corners and intervals
+  var postPositions = [
+    [-roofW/2+2, roofCz-roofD/2+2], [roofW/2-2, roofCz-roofD/2+2],
+    [-roofW/2+2, roofCz+roofD/2-2], [roofW/2-2, roofCz+roofD/2-2],
+    [0, roofCz-roofD/2+2], [0, roofCz+roofD/2-2],
+    [-roofW/2+2, roofCz], [roofW/2-2, roofCz], [0, roofCz]
+  ];
+  postPositions.forEach(function(pp) {
+    bx(0.25, parH + metalRoofGap, 0.25, MRs, pp[0], steelY + (parH+metalRoofGap)/2, pp[1]);
+  });
+
+  // 4. White reflective metal roof sheet (raised, with generous overhang)
+  bx(roofW, 0.15, roofD, MRw, 0, metalRoofY, roofCz);
+  // Roof edge fascia (thin dark strip around metal roof perimeter)
+  bx(roofW, 0.4, 0.12, MFn, 0, metalRoofY - 0.15, roofCz - roofD/2);
+  bx(roofW, 0.4, 0.12, MFn, 0, metalRoofY - 0.15, roofCz + roofD/2);
+  bx(0.12, 0.4, roofD, MFn, -roofW/2, metalRoofY - 0.15, roofCz);
+  bx(0.12, 0.4, roofD, MFn, roofW/2, metalRoofY - 0.15, roofCz);
 
   // ── PLINTH (1.5ft / 450mm above ground — Ghana standard) ──
   bx(TW+1, 1.5, RD+PD+1, MPl, 0, 0.75, (RD+PD)/2);
