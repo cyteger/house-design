@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Model — Linear 3-Room Dwelling</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1A1816;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 0;
+  }
+  #header {
+    width: 100%;
+    padding: 14px 24px;
+    background: #222018;
+    border-bottom: 1px solid #3A3630;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  #header h1 {
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #C8C0A8;
+  }
+  #header p {
+    font-size: 11px;
+    color: #6A6460;
+    letter-spacing: 0.05em;
+  }
+  #wrap {
+    position: relative;
+    width: 100%;
+    flex: 1;
+  }
+  #c3d {
+    width: 100%;
+    height: calc(100vh - 52px);
+    display: block;
+    cursor: grab;
+  }
+  #c3d:active { cursor: grabbing; }
+  #hint {
+    position: absolute;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.55);
+    color: rgba(255,255,255,0.8);
+    font-size: 11px;
+    padding: 6px 16px;
+    border-radius: 20px;
+    pointer-events: none;
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+  }
+  #views {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  #views button {
+    padding: 6px 14px;
+    font-size: 11px;
+    font-weight: 500;
+    background: rgba(255,255,255,0.1);
+    border: 0.5px solid rgba(255,255,255,0.2);
+    border-radius: 6px;
+    cursor: pointer;
+    color: rgba(255,255,255,0.85);
+    letter-spacing: 0.04em;
+    transition: background 0.15s;
+  }
+  #views button:hover { background: rgba(255,255,255,0.2); }
+  #views button.active { background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.4); }
+  #info {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    font-size: 10px;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 0.05em;
+    line-height: 1.7;
+  }
+</style>
+</head>
+<body>
+<div id="header">
+  <h1>Linear 3-Room Dwelling — Interactive 3D Model</h1>
+  <p>Accra, Ghana &nbsp;·&nbsp; 100 × 80 ft plot &nbsp;·&nbsp; Afro-Contemporary Minimalist</p>
+</div>
+<div id="wrap">
+  <div id="c3d"></div>
+  <div id="hint">Street view &nbsp;·&nbsp; Drag to rotate &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Right-drag to pan</div>
+  <div id="views">
+    <button onclick="sv('street')" class="active">Street view</button>
+    <button onclick="sv('front')">Front</button>
+    <button onclick="sv('back')">Back</button>
+    <button onclick="sv('left')">Left side</button>
+    <button onclick="sv('right')">Right side</button>
+    <button onclick="sv('top')">Top / plan</button>
+    <button onclick="sv('persp')">Perspective</button>
+    <button onclick="sv('street')" style="margin-top:8px;background:rgba(255,255,255,0.18);border-color:rgba(255,255,255,0.35)">↺ Reset</button>
+  </div>
+  <div id="info">
+    Rooms: 3 × 15 ft square<br>
+    Porches: 3 × 15 × 8 ft<br>
+    Bath/WC: 10.5 × 23 ft<br>
+    Flat concrete slab roof<br>
+    Plot: 100 × 80 ft with gardens
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  var cont = document.getElementById('c3d');
+  var W = cont.offsetWidth || window.innerWidth;
+  var H = cont.offsetHeight || (window.innerHeight - 52);
+
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x8BAFC8);
+  scene.fog = new THREE.Fog(0x8BAFC8, 160, 320);
+
+  var cam = new THREE.PerspectiveCamera(42, W/H, 0.1, 800);
+  var renderer = new THREE.WebGLRenderer({antialias: true});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(W, H);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  cont.appendChild(renderer.domElement);
+
+  // ── Lighting ──
+  scene.add(new THREE.AmbientLight(0xfff4e0, 0.5));
+
+  var sun = new THREE.DirectionalLight(0xfffae8, 1.4);
+  sun.position.set(60, 90, 40);
+  sun.castShadow = true;
+  sun.shadow.mapSize.width = 2048;
+  sun.shadow.mapSize.height = 2048;
+  var sc = sun.shadow.camera;
+  sc.left = -90; sc.right = 90; sc.top = 90; sc.bottom = -90;
+  sc.near = 1; sc.far = 350;
+  scene.add(sun);
+
+  var fill = new THREE.DirectionalLight(0xc8dff8, 0.45);
+  fill.position.set(-50, 40, -30);
+  scene.add(fill);
+
+  var sky = new THREE.HemisphereLight(0xc8dff0, 0x7AA848, 0.3);
+  scene.add(sky);
+
+  // ── Materials ──
+  var MW  = new THREE.MeshPhongMaterial({color: 0xF0EBE1, shininess: 5});
+  var MWB = new THREE.MeshPhongMaterial({color: 0xECF0F2, shininess: 5});
+  var MR  = new THREE.MeshPhongMaterial({color: 0x222018, shininess: 6});
+  var MG  = new THREE.MeshPhongMaterial({color: 0x9ECCDE, transparent: true, opacity: 0.58, shininess: 120});
+  var MF  = new THREE.MeshPhongMaterial({color: 0x3A3836, shininess: 10});
+  var MFn = new THREE.MeshPhongMaterial({color: 0x2A2826, shininess: 8});
+  var MFl = new THREE.MeshPhongMaterial({color: 0xC6B89C, shininess: 4});
+  var MFg = new THREE.MeshPhongMaterial({color: 0xAA9C84, shininess: 3});
+  var MPl = new THREE.MeshPhongMaterial({color: 0xC4BCAF, shininess: 3});
+  var MGr = new THREE.MeshPhongMaterial({color: 0x7CB84A, shininess: 2});
+  var MPv = new THREE.MeshPhongMaterial({color: 0xD0C6B0, shininess: 3});
+  var MLW = new THREE.MeshPhongMaterial({color: 0x5A5450, shininess: 5});
+  var MGt = new THREE.MeshPhongMaterial({color: 0x6A5E52, shininess: 40});
+  var MD  = new THREE.MeshPhongMaterial({color: 0x1A1816, shininess: 20});
+  var MTr = new THREE.MeshPhongMaterial({color: 0x8B7455, shininess: 3});
+  var MT1 = new THREE.MeshPhongMaterial({color: 0x2E6820, shininess: 2});
+  var MT2 = new THREE.MeshPhongMaterial({color: 0x3A8028, shininess: 2});
+  var MT3 = new THREE.MeshPhongMaterial({color: 0x48962E, shininess: 2});
+  var MSh = new THREE.MeshPhongMaterial({color: 0x347822, shininess: 2});
+  var MFr = new THREE.MeshPhongMaterial({color: 0xD8D0C0, shininess: 5});
+  var MflW= new THREE.MeshPhongMaterial({color: 0xE2D8C0, shininess: 3});
+
+  // helpers
+  function bx(w,h,d,mat,x,y,z,ry) {
+    var m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+    m.position.set(x,y,z);
+    if(ry) m.rotation.y = ry;
+    m.castShadow = true; m.receiveShadow = true;
+    scene.add(m); return m;
+  }
+  function cyl(rt,rb,h,seg,mat,x,y,z) {
+    var m = new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg), mat);
+    m.position.set(x,y,z); m.castShadow = true; m.receiveShadow = true;
+    scene.add(m); return m;
+  }
+  function sph(r,ws,hs,mat,x,y,z,sy) {
+    var m = new THREE.Mesh(new THREE.SphereGeometry(r,ws,hs), mat);
+    m.position.set(x,y,z);
+    if(sy) m.scale.y = sy;
+    m.castShadow = true; scene.add(m); return m;
+  }
+
+  // ── Building constants ──
+  var RW=15, RD=15, PD=8, BW=10.5, WH=10, WT=0.55;
+  var roomXs = [-20, -5, 10];
+  var bathX  = 22.75;
+  var TW = 55.5;
+  var halfW = TW/2 - 0.25; // ~27.5
+
+  // ── GROUND ──
+  // Street / road
+  var MRd = new THREE.MeshPhongMaterial({color: 0x5A5856, shininess: 3});
+  var MSt = new THREE.MeshPhongMaterial({color: 0xC8C2B8, shininess: 2});
+  var MGrDark = new THREE.MeshPhongMaterial({color: 0x6AA838, shininess: 2});
+  bx(260, 0.3, 30, MRd, 0, -0.15, 52);
+  bx(260, 0.35, 4, MSt, 0, -0.12, 35);
+
+  // Plot ground (main green)
+  bx(100, 0.5, 80, MGr, 0, -0.25, 3);
+
+  // ── PAVING BLOCK HELPER ──
+  // Lays individual blocks in a grid with gaps to simulate interlocking pavers
+  var MBk1 = new THREE.MeshPhongMaterial({color: 0xC8BAA0, shininess: 4});
+  var MBk2 = new THREE.MeshPhongMaterial({color: 0xD4C6AC, shininess: 4});
+  var MBk3 = new THREE.MeshPhongMaterial({color: 0xBCAE96, shininess: 4});
+  var MBkEdge = new THREE.MeshPhongMaterial({color: 0x8A7E6E, shininess: 5});
+  var blockMats = [MBk1, MBk2, MBk3];
+
+  function pavingBlocks(cx, cz, areaW, areaD, blockW, blockD, gap, y) {
+    // Edge border
+    bx(areaW+0.4, 0.45, 0.35, MBkEdge, cx, y-0.05, cz - areaD/2);
+    bx(areaW+0.4, 0.45, 0.35, MBkEdge, cx, y-0.05, cz + areaD/2);
+    bx(0.35, 0.45, areaD, MBkEdge, cx - areaW/2, y-0.05, cz);
+    bx(0.35, 0.45, areaD, MBkEdge, cx + areaW/2, y-0.05, cz);
+    // Individual blocks
+    var startX = cx - areaW/2 + blockW/2 + 0.3;
+    var startZ = cz - areaD/2 + blockD/2 + 0.3;
+    var idx = 0;
+    for(var bz = startZ; bz < cz + areaD/2 - 0.3; bz += blockD + gap) {
+      var rowOff = (idx % 2 === 1) ? (blockW + gap) * 0.5 : 0;
+      for(var bxx = startX + rowOff; bxx < cx + areaW/2 - 0.3; bxx += blockW + gap) {
+        var mat = blockMats[(idx + Math.floor(bxx * 3.7)) % 3];
+        bx(blockW, 0.35, blockD, mat, bxx, y, bz);
+      }
+      idx++;
+    }
+  }
+
+  // ── PAVED AREAS WITH BLOCKS ──
+  // Entry area (wide strip in front)
+  pavingBlocks(0, 33, TW+4, 5, 1.8, 0.9, 0.12, 0.05);
+
+  // Walkway connecting porches
+  pavingBlocks(0, 24, TW+2, 3, 1.8, 0.9, 0.12, 0.05);
+
+  // Paths from gates to street
+  [roomXs[0]+RW/2-1.5, roomXs[1]+RW/2-1.5, roomXs[2]+RW/2-1.5].forEach(function(gx) {
+    pavingBlocks(gx, 28, 3, 10, 1.4, 0.7, 0.1, 0.04);
+  });
+
+  // ── GARDEN BEDS WITH DETAIL ──
+  var MSoil = new THREE.MeshPhongMaterial({color: 0x5A4030, shininess: 2});
+  var MEdge = new THREE.MeshPhongMaterial({color: 0x6A5A48, shininess: 3});
+  var MGrass1 = new THREE.MeshPhongMaterial({color: 0x5CAA30, shininess: 2});
+  var MGrass2 = new THREE.MeshPhongMaterial({color: 0x72B840, shininess: 2});
+  var MGrass3 = new THREE.MeshPhongMaterial({color: 0x4A9828, shininess: 2});
+
+  // Simple seeded random for consistent garden layout
+  var _seed = 42;
+  function srand() { _seed = (_seed * 16807 + 0) % 2147483647; return (_seed - 1) / 2147483646; }
+
+  function gardenBed(cx, cz, w, d, hasSoilRows) {
+    // Raised bed with visible border
+    bx(w, 0.6, d, MGrDark, cx, -0.15, cz);
+    // Edging stones around border
+    bx(w+0.3, 0.5, 0.3, MEdge, cx, -0.1, cz - d/2);
+    bx(w+0.3, 0.5, 0.3, MEdge, cx, -0.1, cz + d/2);
+    bx(0.3, 0.5, d, MEdge, cx - w/2, -0.1, cz);
+    bx(0.3, 0.5, d, MEdge, cx + w/2, -0.1, cz);
+    // Grass tufts
+    var grassMats = [MGrass1, MGrass2, MGrass3];
+    for(var gi=0; gi<Math.floor(w*d/4); gi++) {
+      var gx = cx - w/2 + 0.5 + srand()*(w-1);
+      var gz = cz - d/2 + 0.5 + srand()*(d-1);
+      var gr = 0.25 + srand()*0.35;
+      var m = new THREE.Mesh(new THREE.SphereGeometry(gr, 5, 4), grassMats[gi%3]);
+      m.scale.y = 0.4;
+      m.position.set(gx, 0.15, gz);
+      scene.add(m);
+    }
+    // Soil planting rows
+    if(hasSoilRows) {
+      for(var rz = cz - d/2 + 1.5; rz < cz + d/2 - 1; rz += 2.5) {
+        bx(w-1.5, 0.3, 0.6, MSoil, cx, 0.18, rz);
+      }
+    }
+  }
+
+  // Back garden
+  gardenBed(0, -18, 56, 28, true);
+
+  // Side gardens
+  gardenBed(-37, 3, 16, 70, false);
+  gardenBed( 37, 3, 16, 70, false);
+
+  // Front garden patches (between paths)
+  gardenBed(-18, 27, 7, 8, true);
+  gardenBed( -5, 27, 8, 8, true);
+  gardenBed( 10, 27, 8, 8, true);
+
+  // Room + porch floors
+  roomXs.forEach(function(rx) {
+    bx(RW-WT*2, 0.3, RD-0.5, MFr, rx, 0.15, RD/2);
+    bx(RW-WT*2, 0.35, PD-0.3, MflW, rx, 0.17, RD+PD/2-0.15);
+  });
+
+  // ── BACK WALL — each room ──
+  roomXs.forEach(function(rx) {
+    var pw = RW*0.19;
+    // side piers
+    bx(pw, WH, WT, MW, rx-RW/2+pw/2, WH/2, 0);
+    bx(pw, WH, WT, MW, rx+RW/2-pw/2, WH/2, 0);
+    // above window
+    bx(RW-pw*2, WH*0.28, WT, MW, rx, WH-WH*0.14, 0);
+    // below window sill
+    bx(RW-pw*2, WH*0.18, WT, MW, rx, WH*0.09, 0);
+    // glass
+    bx(RW-pw*2-0.2, WH*0.54, 0.1, MG, rx, WH*0.18+WH*0.54/2, 0.06);
+    // frame
+    bx(RW-pw*2, WH*0.54+0.25, 0.08, MF, rx, WH*0.18+WH*0.54/2, 0.04);
+    // mullion
+    bx(0.15, WH*0.54, 0.12, MF, rx, WH*0.18+WH*0.54/2, 0.07);
+    // brise-soleil cap
+    bx(RW-pw*2+0.4, 0.38, 0.95, MFn, rx, WH-WH*0.28+0.2, -0.48);
+    // fins
+    for(var f=0;f<5;f++) {
+      bx(0.16, 0.7, 0.78, MFn, rx-RW*0.25+f*(RW*0.5/4), WH-WH*0.28-0.15, -0.4);
+    }
+  });
+
+  // Bath back wall
+  bx(BW, WH, WT, MWB, bathX, WH/2, 0);
+  bx(BW*0.42, WH*0.22, 0.1, MG, bathX, WH*0.74, 0.06);
+  bx(BW*0.42+0.2, WH*0.22+0.2, 0.08, MF, bathX, WH*0.74, 0.04);
+
+  // ── SIDE WALLS ──
+  // Left end
+  bx(WT, WH, RD+PD, MW, -halfW, WH/2, (RD+PD)/2);
+  // Right end (bath) — lower plain + upper fluted
+  var bex = bathX + BW/2 + WT/2;
+  bx(WT, WH*0.5, RD+PD, MWB, bex, WH*0.25, (RD+PD)/2);
+  bx(WT, WH*0.5, RD+PD, MFl, bex, WH*0.75, (RD+PD)/2);
+  for(var f=0;f<7;f++) {
+    bx(0.48, WH*0.5+0.1, 0.18, MFg, bex+0.38, WH*0.75, 1+f*3.1);
+  }
+
+  // ── DIVIDER WALLS (full depth: room + porch) ──
+  bx(WT, WH, RD+PD, MW, -halfW+RW,   WH/2, (RD+PD)/2);
+  bx(WT, WH, RD+PD, MW, -halfW+2*RW, WH/2, (RD+PD)/2);
+  bx(WT, WH, RD+PD, MW, -halfW+3*RW, WH/2, (RD+PD)/2);
+
+  // ── FRONT WALLS (room/porch dividers with right-aligned doors) ──
+  roomXs.forEach(function(rx) {
+    var xr = rx + RW/2;
+    var dw = 3.0, dh = 7;
+    bx(RW-dw-WT*1.5, WH, WT, MW, rx-RW/2+(RW-dw-WT*1.5)/2, WH/2, RD);
+    bx(dw, WH-dh, WT, MW, xr-dw/2, (WH+dh)/2, RD);
+    bx(dw-0.25, dh-0.12, 0.14, MD, xr-dw/2, dh/2, RD+0.08);
+    bx(dw, dh, 0.1, MF, xr-dw/2, dh/2, RD+0.04);
+  });
+
+  // Bath front wall
+  bx(BW, WH, WT, MWB, bathX, WH/2, RD);
+  // Bath side door
+  bx(WT, WH-7, 3.0, MW, -halfW+3*RW, (WH+7)/2, RD+1.5);
+  bx(2.8, 7, 0.14, MD, -halfW+3*RW-WT, 3.5, RD+2.7);
+
+  // ── PORCH FRONT BEAMS ──
+  var allX = roomXs.concat([bathX]);
+  var allW = [RW, RW, RW, BW];
+  allX.forEach(function(rx, i) {
+    bx(allW[i], 0.5, WT, MFn, rx, WH+1.0, RD+PD);
+  });
+
+  // ── ROOF SLAB ──
+  bx(TW+2.4, 1.5, RD+PD+2.4, MR, 0, WH+0.75, (RD+PD)/2);
+
+  // ── PLINTH ──
+  bx(TW+1, 0.9, RD+PD+1, MPl, 0, 0.45, (RD+PD)/2);
+
+  // ── PORCH LOW WALLS + GATES ──
+  roomXs.forEach(function(rx) {
+    var xl = rx - RW/2, xr = rx + RW/2;
+    var gx = xr - 1.5;
+    var lh = 3.2, lw = 0.45, fz = RD+PD;
+    // left wall
+    var ls = gx-1.5-xl;
+    bx(ls, lh, lw, MLW, xl+ls/2, lh/2, fz);
+    // right wall
+    var rs = xr-(gx+1.5);
+    if(rs>0.1) bx(rs, lh, lw, MLW, gx+1.5+rs/2, lh/2, fz);
+    // end posts
+    bx(0.6, lh+0.2, lw+0.2, MLW, xl,     (lh+0.2)/2, fz);
+    bx(0.6, lh+0.2, lw+0.2, MLW, xr,     (lh+0.2)/2, fz);
+    bx(0.5, lh+0.15,lw+0.15, MLW, gx-1.5,(lh+0.15)/2,fz);
+    bx(0.5, lh+0.15,lw+0.15, MLW, gx+1.5,(lh+0.15)/2,fz);
+    // gate leaves
+    var g1 = new THREE.Mesh(new THREE.BoxGeometry(1.38,2.65,0.09), MGt);
+    g1.position.set(gx-0.72, 1.32, fz+0.28); g1.rotation.y = 0.32;
+    g1.castShadow = true; scene.add(g1);
+    var g2 = new THREE.Mesh(new THREE.BoxGeometry(1.38,2.65,0.09), MGt);
+    g2.position.set(gx+0.72, 1.32, fz+0.28); g2.rotation.y = -0.32;
+    g2.castShadow = true; scene.add(g2);
+    // gate rails
+    bx(0.08, 0.12, 2.95, MGt, gx, 0.9,  fz+0.28);
+    bx(0.08, 0.12, 2.95, MGt, gx, 2.1,  fz+0.28);
+  });
+
+  // ── CIRCULAR GARDEN FEATURE (back garden) ──
+  var MCgOuter = new THREE.MeshPhongMaterial({color: 0x5A8A30, shininess: 3});
+  var MCgInner = new THREE.MeshPhongMaterial({color: 0x4A7828, shininess: 3});
+  var MCgCenter = new THREE.MeshPhongMaterial({color: 0xC8A060, shininess: 5});
+  cyl(5.5, 5.5, 0.6, 24, MCgOuter, 0, 0.3, -16);
+  cyl(3.8, 3.8, 0.7, 24, MCgInner, 0, 0.35, -16);
+  cyl(1.5, 1.5, 0.8, 16, MCgCenter, 0, 0.4, -16);
+
+  // ── BACK GARDEN PATH (stone path to circular feature) ──
+  bx(2.5, 0.5, 14, MPv, 0, -0.18, -8);
+
+  // ── PLOT BOUNDARY FENCE (low, subtle) ──
+  var MFnc = new THREE.MeshPhongMaterial({color: 0x7A9A60, shininess: 3});
+  bx(100, 1.0, 0.3, MFnc, 0, 0.5, -33);  // back fence
+  bx(0.3, 1.0, 68, MFnc, -50, 0.5, 1);    // left fence
+  bx(0.3, 1.0, 68, MFnc, 50, 0.5, 1);     // right fence
+
+  // ── TREES ──
+  function tree(x,z,h,r) {
+    cyl(0.32, 0.5, h*0.45, 8, MTr, x, h*0.225, z);
+    sph(r,      9,7, MT1, x, h*0.45+r*0.6,  z, 0.9);
+    sph(r*0.72, 8,6, MT2, x, h*0.45+r*1.2,  z, 0.85);
+    sph(r*0.45, 7,5, MT3, x, h*0.45+r*1.65, z, 0.8);
+  }
+  // Back garden trees
+  tree(-15, -18, 9, 5.2);
+  tree( 17, -18, 9, 5.2);
+  // Side garden trees
+  tree(-37, -10, 7, 4.0);
+  tree(-37,  12, 6, 3.4);
+  tree( 37, -10, 7, 4.0);
+  tree( 37,  12, 5, 2.9);
+
+  // ── SHRUBS ──
+  function shrub(x,z,r) {
+    var m = new THREE.Mesh(new THREE.SphereGeometry(r,8,6), MSh);
+    m.scale.y = 0.7; m.position.set(x, r*0.7, z);
+    m.castShadow = true; scene.add(m);
+  }
+  // Front shrubs near porches
+  roomXs.forEach(function(rx) {
+    var gx = rx + RW/2 - 1.5;
+    shrub(gx-2.3, 26, 1.1); shrub(gx+2.3, 26, 1.1);
+    shrub(rx-RW/2+1.2, 25.5, 0.85);
+  });
+  // Side garden shrubs
+  shrub(-37, -2, 1.4); shrub(-37, 5, 1.4);
+  shrub( 37, -2, 1.4); shrub( 37, 5, 1.4);
+  // Hedge rows along side gardens
+  for(var si=-20; si<=15; si+=4) {
+    shrub(-46, si, 1.0);
+    shrub( 46, si, 1.0);
+  }
+
+  // ── FLOWERS ──
+  var fC = [0xE83830,0xF09030,0xF0B030,0xD06838,0xE05050];
+  var goffs = roomXs.map(function(rx){return rx+RW/2-1.5;});
+  var fpts = [
+    [goffs[0]-5,27],[goffs[0]-3,28.5],
+    [goffs[1]-4,27.5],[goffs[1]+4,28],
+    [goffs[2]-4,27],[goffs[2]+3,28.5],
+    [-15,29],[0,30],[15,29],
+    // circular garden accent flowers
+    [3,-13],[-3,-13],[0,-20],[4,-19],[-4,-19]
+  ];
+  fpts.forEach(function(p,i){
+    sph(0.6,6,4, new THREE.MeshPhongMaterial({color:fC[i%5]}), p[0],0.5,p[1], 0.5);
+  });
+
+  // ── CAMERA + ORBIT ──
+  // Default: street-level front view — adult standing ~20ft from porch
+  var defaultOrbit = {theta: 0, phi: Math.PI*0.44, r: 64};
+  var defaultTgt = new THREE.Vector3(0, 5, 11);
+  var orbit = {theta: defaultOrbit.theta, phi: defaultOrbit.phi, r: defaultOrbit.r};
+  var tgt = defaultTgt.clone();
+
+  function applyCamera() {
+    cam.position.set(
+      tgt.x + orbit.r * Math.sin(orbit.phi) * Math.sin(orbit.theta),
+      tgt.y + orbit.r * Math.cos(orbit.phi),
+      tgt.z + orbit.r * Math.sin(orbit.phi) * Math.cos(orbit.theta)
+    );
+    cam.lookAt(tgt);
+  }
+  applyCamera();
+
+  var dragging=false, rightDrag=false, mx=0, my=0;
+  var el = renderer.domElement;
+
+  el.addEventListener('mousedown', function(e){
+    dragging=true; rightDrag=(e.button===2); mx=e.clientX; my=e.clientY; e.preventDefault();
+  });
+  el.addEventListener('contextmenu', function(e){e.preventDefault();});
+  window.addEventListener('mouseup', function(){dragging=false;});
+  window.addEventListener('mousemove', function(e){
+    if(!dragging) return;
+    var dx=e.clientX-mx, dy=e.clientY-my; mx=e.clientX; my=e.clientY;
+    if(rightDrag){ tgt.x-=dx*0.06; tgt.y+=dy*0.06; }
+    else {
+      orbit.theta -= dx*0.006;
+      orbit.phi = Math.max(0.05, Math.min(Math.PI*0.49, orbit.phi+dy*0.006));
+    }
+    applyCamera();
+  });
+  el.addEventListener('wheel', function(e){
+    orbit.r = Math.max(18, Math.min(220, orbit.r+e.deltaY*0.1));
+    applyCamera(); e.preventDefault();
+  }, {passive:false});
+
+  var lt = null;
+  el.addEventListener('touchstart', function(e){ lt={x:e.touches[0].clientX,y:e.touches[0].clientY}; e.preventDefault(); },{passive:false});
+  el.addEventListener('touchmove', function(e){
+    if(!lt) return;
+    orbit.theta -= (e.touches[0].clientX-lt.x)*0.006;
+    orbit.phi = Math.max(0.05, Math.min(Math.PI*0.49, orbit.phi+(e.touches[0].clientY-lt.y)*0.006));
+    lt = {x:e.touches[0].clientX, y:e.touches[0].clientY};
+    applyCamera(); e.preventDefault();
+  },{passive:false});
+
+  // View presets
+  var presets = {
+    street: {theta:0,            phi:Math.PI*0.49, r:64},
+    front:  {theta:Math.PI,      phi:0.24, r:88},
+    back:   {theta:0,            phi:0.24, r:88},
+    left:   {theta:Math.PI*1.5,  phi:0.23, r:82},
+    right:  {theta:Math.PI*0.5,  phi:0.23, r:82},
+    top:    {theta:Math.PI*1.28, phi:0.05, r:115},
+    persp:  {theta:Math.PI*1.28, phi:0.27, r:100}
+  };
+  window.sv = function(v) {
+    var p = presets[v] || presets.street;
+    orbit.theta=p.theta; orbit.phi=p.phi; orbit.r=p.r;
+    // Reset target for street view, use standard target for others
+    if(v === 'street') { tgt.copy(defaultTgt); }
+    else { tgt.set(0, 5, 11); }
+    applyCamera();
+    document.querySelectorAll('#views button').forEach(function(b){b.classList.remove('active');});
+    event.target.classList.add('active');
+  };
+
+  window.addEventListener('resize', function(){
+    var nw = cont.offsetWidth;
+    var nh = cont.offsetHeight;
+    renderer.setSize(nw, nh);
+    cam.aspect = nw/nh;
+    cam.updateProjectionMatrix();
+  });
+
+  (function loop(){ requestAnimationFrame(loop); renderer.render(scene, cam); })();
+})();
+</script>
+</body>
+</html>

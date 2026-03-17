@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linear 3-Room Dwelling — Design Package</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:#F5F1E8;
+    font-family:Georgia,'Times New Roman',serif;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:48px 16px;
+  }
+  .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#8A8480;margin-bottom:10px;text-align:center}
+  h1{font-size:28px;font-weight:normal;color:#1E1C1A;letter-spacing:.04em;margin-bottom:6px;text-align:center}
+  .sub{font-size:13px;color:#6A6460;margin-bottom:48px;text-align:center;line-height:1.7}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;max-width:680px;width:100%}
+  .card{
+    background:#fff;
+    border:1px solid #D8D0C0;
+    border-radius:10px;
+    padding:28px 24px;
+    text-decoration:none;
+    color:inherit;
+    display:block;
+    transition:box-shadow .2s, transform .15s;
+  }
+  .card:hover{box-shadow:0 8px 32px rgba(0,0,0,0.10);transform:translateY(-2px)}
+  .card-icon{font-size:28px;margin-bottom:14px;display:block}
+  .card h2{font-size:16px;font-weight:normal;color:#1E1C1A;margin-bottom:6px;letter-spacing:.02em}
+  .card p{font-size:12px;color:#7A7470;line-height:1.65}
+  .card .tag{display:inline-block;font-size:10px;background:#EAE8E0;color:#5A5450;padding:3px 10px;border-radius:4px;margin-top:12px;letter-spacing:.06em;font-family:-apple-system,sans-serif}
+  footer{margin-top:48px;font-size:11px;color:#A8A098;letter-spacing:.05em;text-align:center}
+</style>
+</head>
+<body>
+  <div class="eyebrow">Accra, Ghana · 100 × 80 ft plot</div>
+  <h1>Linear 3-Room Dwelling</h1>
+  <p class="sub">Afro-Contemporary Minimalist · Single storey flat-roof design<br>Open in any browser — no installation required</p>
+
+  <div class="cards">
+    <a class="card" href="site-plan.html">
+      <span class="card-icon">📐</span>
+      <h2>Site plan with gardens</h2>
+      <p>Full plot layout showing the three rooms, porches, paved paths, gate positions, back garden, side gardens, and planting features. Includes dimensions and north arrow.</p>
+      <span class="tag">Static SVG · site-plan.html</span>
+    </a>
+    <a class="card" href="model-3d.html">
+      <span class="card-icon">🏠</span>
+      <h2>Interactive 3D model</h2>
+      <p>Drag to orbit, scroll to zoom, right-drag to pan. Jump to Front, Back, Left, Right, Top, and Perspective views using the buttons. Includes trees, shrubs, paths, and gates.</p>
+      <span class="tag">Three.js WebGL · model-3d.html</span>
+    </a>
+  </div>
+
+  <footer>Designed with Claude · Requires internet connection for 3D model (Three.js CDN)</footer>
+</body>
+</html>
