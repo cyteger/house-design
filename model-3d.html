@@ -415,14 +415,37 @@
   bx(WT, WH, RD+PD, MW, -halfW+2*RW, WH/2, (RD+PD)/2);
   bx(WT, WH, RD+PD, MW, -halfW+3*RW, WH/2, (RD+PD)/2);
 
-  // ── FRONT WALLS (room/porch dividers with right-aligned doors) ──
+  // ── FRONT WALLS (room/porch dividers with door + window) ──
+  // Door: 3ft wide × 7ft high (right-aligned)
+  // Window: 4ft wide × 4ft high, sill at 3ft (centred in remaining wall)
   roomXs.forEach(function(rx) {
-    var xr = rx + RW/2;
+    var xl = rx - RW/2, xr = rx + RW/2;
     var dw = 3.0, dh = 7;
-    bx(RW-dw-WT*1.5, WH, WT, MW, rx-RW/2+(RW-dw-WT*1.5)/2, WH/2, RD);
-    bx(dw, WH-dh, WT, MW, xr-dw/2, (WH+dh)/2, RD);
-    bx(dw-0.25, dh-0.12, 0.14, MD, xr-dw/2, dh/2, RD+0.08);
-    bx(dw, dh, 0.1, MF, xr-dw/2, dh/2, RD+0.04);
+    var fwW = winW; // 4ft window
+    var fwH = winH; // 4ft window
+    // Wall section widths: [left pier | window | mid pier | door | right edge]
+    var wallLeft = RW - dw - WT; // wall area left of door
+    var winCx = xl + wallLeft/2; // centre window in that area
+
+    // Below sill (full width left of door)
+    bx(wallLeft, sillH, WT, MW, xl + wallLeft/2, sillH/2, RD);
+    // Above head (full width left of door)
+    bx(wallLeft, WH - headH, WT, MW, xl + wallLeft/2, headH + (WH-headH)/2, RD);
+    // Left of window
+    var lww = (wallLeft - fwW) / 2;
+    bx(lww, fwH, WT, MW, xl + lww/2, sillH + fwH/2, RD);
+    // Right of window
+    bx(lww, fwH, WT, MW, xl + wallLeft - lww/2, sillH + fwH/2, RD);
+    // Window glass + frame
+    bx(fwW - 0.2, fwH - 0.2, 0.1, MG, winCx, sillH + fwH/2, RD + 0.06);
+    bx(fwW, fwH, 0.08, MF, winCx, sillH + fwH/2, RD + 0.04);
+    bx(0.15, fwH, 0.12, MF, winCx, sillH + fwH/2, RD + 0.07); // mullion
+
+    // Above door (lintel)
+    bx(dw, WH - dh, WT, MW, xr - dw/2, (WH + dh)/2, RD);
+    // Door panel + frame
+    bx(dw - 0.25, dh - 0.12, 0.14, MD, xr - dw/2, dh/2, RD + 0.08);
+    bx(dw, dh, 0.1, MF, xr - dw/2, dh/2, RD + 0.04);
   });
 
   // Bath front wall
@@ -446,37 +469,78 @@
   bx(TW+1, 1.5, RD+PD+1, MPl, 0, 0.75, (RD+PD)/2);
 
   // ── PORCH LOW WALLS + GATES ──
-  // Dwarf wall: 3ft high, 5" block + plaster = 0.42ft thick (Ghana standard)
-  // Pedestrian gate: 3ft wide × 6ft high (Ghana standard)
-  var gateW = 3.0, gateH = 6.0;
+  // Dwarf wall: 1/3 door height = 7/3 ≈ 2.33ft, 5" block + plaster = 0.42ft thick
+  // Pedestrian gate: 3ft wide × matching wall height
+  var gateW = 3.0;
+  var lh = 4.5; // porch dwarf wall — just above waist height
   roomXs.forEach(function(rx) {
     var xl = rx - RW/2, xr = rx + RW/2;
     var gx = xr - gateW/2;  // gate centred on right side of porch
-    var lh = 3.0, lw = 0.42, fz = RD+PD;
+    var lw = 0.42, fz = RD+PD;
     // left wall segment
     var ls = gx - gateW/2 - xl;
     if(ls > 0.1) bx(ls, lh, lw, MLW, xl+ls/2, lh/2, fz);
     // right wall segment
     var rs = xr - (gx + gateW/2);
     if(rs > 0.1) bx(rs, lh, lw, MLW, gx+gateW/2+rs/2, lh/2, fz);
-    // Gate posts (0.5ft square pillars, full gate height)
-    bx(0.5, gateH, 0.5, MLW, gx-gateW/2, gateH/2, fz);
-    bx(0.5, gateH, 0.5, MLW, gx+gateW/2, gateH/2, fz);
-    // End posts at wall corners
-    bx(0.5, lh+0.2, lw+0.15, MLW, xl, (lh+0.2)/2, fz);
-    bx(0.5, lh+0.2, lw+0.15, MLW, xr, (lh+0.2)/2, fz);
-    // Gate leaves (two leaves, each 1.5ft wide × 6ft high)
-    var leafW = gateW/2;
-    var g1 = new THREE.Mesh(new THREE.BoxGeometry(leafW-0.1, gateH-0.2, 0.08), MGt);
-    g1.position.set(gx-leafW/2, gateH/2, fz+0.25); g1.rotation.y = 0.3;
-    g1.castShadow = true; scene.add(g1);
-    var g2 = new THREE.Mesh(new THREE.BoxGeometry(leafW-0.1, gateH-0.2, 0.08), MGt);
-    g2.position.set(gx+leafW/2, gateH/2, fz+0.25); g2.rotation.y = -0.3;
-    g2.castShadow = true; scene.add(g2);
-    // Gate horizontal rails
-    bx(0.06, 0.1, gateW-0.2, MGt, gx, gateH*0.25, fz+0.25);
-    bx(0.06, 0.1, gateW-0.2, MGt, gx, gateH*0.5,  fz+0.25);
-    bx(0.06, 0.1, gateW-0.2, MGt, gx, gateH*0.75, fz+0.25);
+    // Corner posts (capped pillars at wall height)
+    bx(0.5, lh+0.3, 0.5, MLW, xl, (lh+0.3)/2, fz);
+    bx(0.5, lh+0.3, 0.5, MLW, xr, (lh+0.3)/2, fz);
+    // Gate posts (slightly taller than wall for visual emphasis)
+    var gpH = lh + 0.6;
+    bx(0.5, gpH, 0.5, MLW, gx-gateW/2, gpH/2, fz);
+    bx(0.5, gpH, 0.5, MLW, gx+gateW/2, gpH/2, fz);
+    // Post caps (decorative top)
+    bx(0.65, 0.15, 0.65, MLW, gx-gateW/2, gpH+0.07, fz);
+    bx(0.65, 0.15, 0.65, MLW, gx+gateW/2, gpH+0.07, fz);
+
+    // ── METAL GATE (proper panel gate with frame + vertical bars) ──
+    var leafW = (gateW - 0.5) / 2; // each leaf, accounting for post width
+    var gH = lh; // gate matches wall height
+
+    function makeGateLeaf(cx, openAngle) {
+      var group = new THREE.Group();
+      // Outer frame (top, bottom, sides)
+      var bar = 0.12; // frame bar thickness
+      // Top rail
+      var tb = new THREE.Mesh(new THREE.BoxGeometry(leafW, bar, bar), MGt);
+      tb.position.set(0, gH - bar/2, 0); group.add(tb);
+      // Bottom rail
+      var bb = new THREE.Mesh(new THREE.BoxGeometry(leafW, bar, bar), MGt);
+      bb.position.set(0, bar/2, 0); group.add(bb);
+      // Middle rail
+      var mb = new THREE.Mesh(new THREE.BoxGeometry(leafW, bar, bar), MGt);
+      mb.position.set(0, gH/2, 0); group.add(mb);
+      // Hinge side vertical
+      var hv = new THREE.Mesh(new THREE.BoxGeometry(bar, gH, bar), MGt);
+      hv.position.set(-leafW/2 + bar/2, gH/2, 0); group.add(hv);
+      // Latch side vertical
+      var lv = new THREE.Mesh(new THREE.BoxGeometry(bar, gH, bar), MGt);
+      lv.position.set(leafW/2 - bar/2, gH/2, 0); group.add(lv);
+      // Vertical infill bars (spaced ~0.33ft / 4 inches apart)
+      var barSpacing = 0.33;
+      var startBar = -leafW/2 + bar + barSpacing;
+      for(var vb = startBar; vb < leafW/2 - bar; vb += barSpacing) {
+        var ib = new THREE.Mesh(new THREE.BoxGeometry(0.06, gH - bar*2, 0.06), MGt);
+        ib.position.set(vb, gH/2, 0); group.add(ib);
+      }
+      // Panel sheet (lower half — solid metal panel)
+      var panelH = gH/2 - bar;
+      var panelMat = new THREE.MeshPhongMaterial({color: 0x5A5048, shininess: 30});
+      var panel = new THREE.Mesh(new THREE.BoxGeometry(leafW - bar*2, panelH, 0.04), panelMat);
+      panel.position.set(0, bar + panelH/2, 0); group.add(panel);
+
+      group.traverse(function(c){ if(c.isMesh){ c.castShadow=true; c.receiveShadow=true; }});
+      // Position: pivot at hinge edge
+      group.position.set(cx, 0, fz);
+      group.rotation.y = openAngle;
+      scene.add(group);
+    }
+
+    // Left leaf (hinges at left gate post)
+    makeGateLeaf(gx - leafW/2 - 0.12, 0.25);
+    // Right leaf (hinges at right gate post)
+    makeGateLeaf(gx + leafW/2 + 0.12, -0.25);
   });
 
   // ── CIRCULAR GARDEN FEATURE (back garden) ──
